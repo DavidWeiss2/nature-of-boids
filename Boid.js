@@ -5,10 +5,10 @@ export class Boid {
         this.pos = createVector(x, y);
         this.vel = createVector(1, 0);
         this.acc = createVector(0, 0);
-        this.maxForce = 0.2;
         this.health = random(50, 150);
         this.r = this.health / 6.25;
         this.perceptionRadius = this.r * 5;
+        this.maxForce = this.health/500;
 
         this.wanderTheta = PI / 2;
     }
@@ -45,23 +45,28 @@ export class Boid {
             }
         }
         if (seek.length > 0) {
+            let closest = -1;
             for (let i = 0; i < seek.length; i++) {
                 if (perceptionPoint.dist(seek[i].pos) > this.perceptionRadius * 1.5) continue;
-                this.applyForce(this.pursue(seek[i]));
-                if (this.pos.dist(seek[i].pos) < this.r ** 0.5) {
-                    this.health += seek[i].health / 10;
-                    seek[i].health = 0;
+                if (closest == -1 || this.pos.dist(seek[i].pos) < this.pos.dist(seek[closest].pos)) {
+                    closest = i;
+                }
+            }
+            if (closest != -1) {
+                this.applyForce(this.pursue(seek[closest]));
+                if (this.pos.dist(seek[closest].pos) < this.r ** 0.5) {
+                    this.health += seek[closest].health / 10;
+                    seek[closest].health = 0;
                 }
                 if (this.debug) {
                     fill(0, 255, 0);
                     noStroke();
-                    circle(seek[i].pos.x, seek[i].pos.y, 16);
+                    circle(seek[closest].pos.x, seek[closest].pos.y, 16);
 
                     stroke(0, 255, 0);
-                    line(this.pos.x, this.pos.y, seek[i].pos.x, seek[i].pos.y);
+                    line(this.pos.x, this.pos.y, seek[closest].pos.x, seek[closest].pos.y);
                 }
                 forceWasApplied = true;
-                break;
             }
         }
         if (forceWasApplied) return;
@@ -142,7 +147,7 @@ export class Boid {
         drag.normalize();
         drag.mult(-1);
         let speedSq = this.vel.magSq();
-        drag.setMag(this.health / 10000 * speedSq);
+        drag.setMag(Math.min(this.health / 10000 * speedSq), 0.001);
         this.applyForce(drag);
     }
 
@@ -153,6 +158,7 @@ export class Boid {
         this.acc.set(0, 0);
         this.r = this.health / 6.25;
         this.perceptionRadius = this.r * 5;
+        this.maxForce = this.health / 500;
     }
 
     show() {
