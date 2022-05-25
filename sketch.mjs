@@ -24,6 +24,11 @@ window.draw = function () {
 		boids[i].edges();
 		boids[i].update();
 		boids[i].show();
+		if(boids[i].health <= 0) {
+			boids.splice(i, 1);
+			// boids.push(new Boid());
+			console.log('one down')
+		}
 	}
 };
 

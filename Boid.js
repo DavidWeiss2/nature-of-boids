@@ -5,8 +5,9 @@ export class Boid {
         this.pos = createVector(x, y);
         this.vel = createVector(1, 0);
         this.acc = createVector(0, 0);
-        this.maxSpeed = 4+random(2);
-        this.maxForce = 0.2 + random(0.2);
+        this.maxSpeed = 4;
+        this.maxForce = 0.2;
+        this.health = 100;
         this.r = 16;
 
         this.wanderTheta = PI / 2;
@@ -18,15 +19,16 @@ export class Boid {
         perceptionPoint.add(this.pos);
         if (avoid.length > 0) {
             for (let i = 0; i < avoid.length; i++) {
-                if (perceptionPoint.dist(avoid[i].pos) > this.perceptionRadius/3) continue;
+                if (perceptionPoint.dist(avoid[i].pos) > this.perceptionRadius) continue;
                 this.applyForce(this.evade(avoid[i]));
                 return;
             }
         }
         if (seek.length > 0) {
             for (let i = 0; i < seek.length; i++) {
-                if (perceptionPoint.dist(seek[i].pos) > this.perceptionRadius*3) continue;
+                if (perceptionPoint.dist(seek[i].pos) > this.perceptionRadius) continue;
                 this.applyForce(this.pursue(seek[i]));
+                if (this.pos.dist(seek[i].pos)< this.r**0.5) seek[i].health = 0;
                 return;
             }
         }
