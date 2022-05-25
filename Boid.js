@@ -18,33 +18,32 @@ export class Boid {
         let wanderPoint = this.vel.copy();
         wanderPoint.setMag(this.perceptionRadius);
         wanderPoint.add(this.pos);
-        fill(255, 0, 0);
-        noStroke();
-        circle(wanderPoint.x, wanderPoint.y, 8);
+        // fill(255, 0, 0);
+        // noStroke();
+        // circle(wanderPoint.x, wanderPoint.y, 8);
 
-        let wanderRadius = this.perceptionRadius - this.r * 2;
-        noFill();
-        stroke(255);
-        circle(wanderPoint.x, wanderPoint.y, wanderRadius * 2);
-        line(this.pos.x, this.pos.y, wanderPoint.x, wanderPoint.y);
+        let wanderRadius = this.perceptionRadius;
+        // noFill();
+        // stroke(255);
+        // circle(wanderPoint.x, wanderPoint.y, wanderRadius * 2);
+        // line(this.pos.x, this.pos.y, wanderPoint.x, wanderPoint.y);
 
         let theta = this.wanderTheta + this.vel.heading();
         let x = wanderRadius * cos(theta);
         let y = wanderRadius * sin(theta);
 
         wanderPoint.add(x, y);
-        fill(0, 255, 0);
-        noStroke();
-        circle(wanderPoint.x, wanderPoint.y, 16);
+        // fill(0, 255, 0);
+        // noStroke();
+        // circle(wanderPoint.x, wanderPoint.y, 16);
 
-        stroke(255);
-        line(this.pos.x, this.pos.y, wanderPoint.x, wanderPoint.y);
-
-
-        this.applyForce(this.arrive(wanderPoint));
+        // stroke(255);
+        // line(this.pos.x, this.pos.y, wanderPoint.x, wanderPoint.y);
 
         let displaceRange = 0.3;
         this.wanderTheta += random(-displaceRange, displaceRange);
+
+        return this.arrive(wanderPoint);
     }
 
 
@@ -111,7 +110,7 @@ export class Boid {
         push();
         translate(this.pos.x, this.pos.y);
         rotate(this.vel.heading());
-        triangle(-this.r, -this.r / 2, -this.r, this.r / 2, this.r, 0);
+        triangle(-this.r*2, -this.r / 2, -this.r*2, this.r / 2, 0, 0);
         pop();
 
         beginShape();
