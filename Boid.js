@@ -1,14 +1,13 @@
 export class Boid {
-    perceptionRadius = 100;
 
     constructor(x = random(window.innerWidth), y = random(window.innerHeight)) {
         this.pos = createVector(x, y);
         this.vel = createVector(1, 0);
         this.acc = createVector(0, 0);
-        this.maxSpeed = 4;
-        this.maxForce = 0.2;
         this.health = 100;
+        this.maxForce = 0.2;
         this.r = 16;
+        this.perceptionRadius = this.r * 5;
 
         this.wanderTheta = PI / 2;
     }
@@ -28,7 +27,7 @@ export class Boid {
             for (let i = 0; i < seek.length; i++) {
                 if (perceptionPoint.dist(seek[i].pos) > this.perceptionRadius) continue;
                 this.applyForce(this.pursue(seek[i]));
-                if (this.pos.dist(seek[i].pos)< this.r**0.5) seek[i].health = 0;
+                if (this.pos.dist(seek[i].pos) < this.r ** 0.5) seek[i].health = 0;
                 return;
             }
         }
@@ -53,12 +52,12 @@ export class Boid {
 
     seek(target, arrival = false) {
         let force = p5.Vector.sub(target, this.pos);
-        let desiredSpeed = this.maxSpeed;
+        let desiredSpeed = this.r/4;
         if (arrival) {
             let slowRadius = this.perceptionRadius;
             let distance = force.mag();
             if (distance < slowRadius) {
-                desiredSpeed = map(distance, 0, slowRadius, 0, this.maxSpeed);
+                desiredSpeed = map(distance, 0, slowRadius, 0, this.vel);
             }
         }
         force.setMag(desiredSpeed);
@@ -94,10 +93,18 @@ export class Boid {
         this.acc.add(force);
     }
 
+    drag() {
+        let drag = this.vel.copy();
+        drag.normalize();
+        drag.mult(-1);
+        let speedSq = this.vel.magSq();
+        drag.setMag(this.health/10000 * speedSq);
+        this.applyForce(drag);
+    }
+
     update() {
-        // console.log({ vel: this.vel.mag(), acc: this.acc.mag() });
+        this.drag();
         this.vel.add(this.acc);
-        this.vel.limit(this.maxSpeed);
         this.pos.add(this.vel);
         this.acc.set(0, 0);
     }

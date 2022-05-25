@@ -26,7 +26,7 @@ window.draw = function () {
 		boids[i].show();
 		if(boids[i].health <= 0) {
 			boids.splice(i, 1);
-			// boids.push(new Boid());
+			boids.push(new Boid());
 			console.log('one down')
 		}
 	}
