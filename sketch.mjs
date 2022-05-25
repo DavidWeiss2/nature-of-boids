@@ -1,7 +1,7 @@
 import "./p5.js";
 import { Boid } from "./Boid.js";
 
-const maxNumBoids = 1;
+const maxNumBoids = 30;
 
 let width = window.innerWidth;
 let height = window.innerHeight;
@@ -19,11 +19,11 @@ window.setup = function () {
 
 window.draw = function () {
 	background(0);
-	for (let boid of boids) {
-		boid.ai();
-		boid.edges();
-		boid.update();
-		boid.show();
+	for (let i = boids.length; i--;) {
+		boids[i].ai(boids.slice(0, i), boids.slice(i + 1, boids.length));
+		boids[i].edges();
+		boids[i].update();
+		boids[i].show();
 	}
 };
 
