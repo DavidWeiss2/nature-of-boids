@@ -14,6 +14,10 @@ export class Boid {
         this.currentPath = [];
     }
 
+    ai() {
+        this.applyForce(this.wander());
+    }
+
     wander() {
         let wanderPoint = this.vel.copy();
         wanderPoint.setMag(this.perceptionRadius);

@@ -20,7 +20,7 @@ window.setup = function () {
 window.draw = function () {
 	background(0);
 	for (let boid of boids) {
-		boid.wander();
+		boid.ai();
 		boid.edges();
 		boid.update();
 		boid.show();
