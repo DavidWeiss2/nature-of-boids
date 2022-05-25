@@ -1,14 +1,22 @@
 export class Boid {
 
-    constructor(x = random(window.innerWidth), y = random(window.innerHeight)) {
+    constructor(boidColor = null, x = random(window.innerWidth), y = random(window.innerHeight)) {
+        this.color = boidColor;
+        if (this.color === null) {
+            this.color = color(random(255), random(255), random(255));
+        }
+        this.fear = map(this.color.levels[0], 0, 255, -1, 1);
+        this.sight = map(this.color.levels[1], 0, 255, 0, 2);
+        this.anger = map(this.color.levels[2], 0, 255, -1, 1);
+
         this.debug = false;
         this.pos = createVector(x, y);
         this.vel = createVector(1, 0);
         this.acc = createVector(0, 0);
-        this.health = random(50, 150);
+        this.health = random(150);
         this.r = this.health / 6.25;
-        this.perceptionRadius = this.r * 5;
-        this.maxForce = this.health/500;
+        this.perceptionRadius = (this.r * 5) * (this.sight);
+        this.maxForce = this.health / 500;
 
         this.wanderTheta = PI / 2;
     }
@@ -32,16 +40,8 @@ export class Boid {
         if (avoid.length > 0) {
             for (let i = 0; i < avoid.length; i++) {
                 if (this.pos.dist(avoid[i].pos) > this.perceptionRadius * 2) continue;
-                this.applyForce(this.evade(avoid[i]));
+                this.applyForce(this.evade(avoid[i]).mult(this.fear));
                 forceWasApplied = true;
-                if (this.debug) {
-                    fill(255, 0, 0);
-                    noStroke();
-                    circle(avoid[i].pos.x, avoid[i].pos.y, 16);
-
-                    stroke(255, 0, 0);
-                    line(this.pos.x, this.pos.y, avoid[i].pos.x, avoid[i].pos.y);
-                }
             }
         }
         if (seek.length > 0) {
@@ -53,24 +53,21 @@ export class Boid {
                 }
             }
             if (closest != -1) {
-                this.applyForce(this.pursue(seek[closest]));
-                if (this.pos.dist(seek[closest].pos) < this.r ** 0.5) {
-                    this.health += seek[closest].health / 10;
-                    seek[closest].health = 0;
-                }
-                if (this.debug) {
-                    fill(0, 255, 0);
-                    noStroke();
-                    circle(seek[closest].pos.x, seek[closest].pos.y, 16);
-
-                    stroke(0, 255, 0);
-                    line(this.pos.x, this.pos.y, seek[closest].pos.x, seek[closest].pos.y);
-                }
+                const boidToPursue = seek[closest];
+                this.pursueBoid(boidToPursue);
                 forceWasApplied = true;
             }
         }
         if (forceWasApplied) return;
         this.applyForce(this.wander(perceptionPoint));
+    }
+
+    pursueBoid(boidToPursue) {
+        this.applyForce(this.pursue(boidToPursue,color(0,255,0)).mult(this.anger));
+        if (this.pos.dist(boidToPursue.pos) < this.r ** 0.5) {
+            this.health += boidToPursue.health / 10;
+            boidToPursue.health = 0;
+        }
     }
 
     wander(perceptionPoint) {
@@ -97,7 +94,152 @@ export class Boid {
         return steer;
     }
 
+    flock(boids) {
+        if (!separationOnBoidsFromOtherSpecies.checked()) {
+            boids = boids.filter((boid) => boid.myColor === this.myColor);
+        }
 
+        let alignment = this.align(boids, debug);
+        let cohesion = this.cohesion(boids, debug);
+        let separation = this.separation(boids, debug);
+
+        alignment.mult(alignSlider.value());
+        cohesion.mult(cohesionSlider.value());
+        separation.mult(separationSlider.value());
+
+        this.acceleration.add(alignment);
+        this.acceleration.add(cohesion);
+        this.acceleration.add(separation);
+    }
+
+    align(boids, debug = false) {
+        let steering = createVector();
+        let total = 0;
+        this.flagsRGBforACS[0] = 0;
+        for (let other of boids) {
+            if (other.myColor != this.myColor) continue;
+            let d = this.toroidalDistance(other.position);
+            if (other != this && d < Boid.alignmentPerceptionRadius()) {
+                let { dx, dy } = this.ShortestDxDy(other.position);
+                let vec = createVector(dx, dy);
+                if (
+                    Math.abs(this.velocity.angleBetween(vec)) <
+                    PerceptionDagreesSlider.value()
+                ) {
+                    steering.add(other.velocity);
+                    total++;
+                    if (debug) {
+                        push();
+                        stroke(0, 255, 0, alignSlider.value() * 100 + 30);
+                        line(
+                            this.position.x,
+                            this.position.y,
+                            this.position.x + vec.x,
+                            this.position.y + vec.y
+                        );
+                        pop();
+                    }
+                    this.flagsRGBforACS[0] = 1;
+                }
+            }
+        }
+        if (total > 0) {
+            steering.div(total);
+            steering.setMag(Boid.maxSpeed);
+            steering.sub(this.velocity);
+            steering.limit(Boid.maxForce);
+        }
+        return steering;
+    }
+
+    separation(boids, debug = false) {
+        let steering = createVector();
+        let total = 0;
+        this.flagsRGBforACS[2] = 0;
+        for (let other of boids) {
+            if (
+                !separationOnBoidsFromOtherSpecies.checked() &&
+                other.myColor != this.myColor
+            )
+                continue;
+            let d = this.toroidalDistance(other.position);
+            if (other != this && d < Boid.separationPerceptionRadius()) {
+                let { dx, dy } = this.ShortestDxDy(other.position);
+                let vec = createVector(dx, dy);
+                if (
+                    Math.abs(this.velocity.angleBetween(vec)) <
+                    PerceptionDagreesSlider.value()
+                ) {
+                    let diff = p5.Vector.sub(this.position, other.position);
+                    diff.div(d * d);
+                    steering.add(diff);
+                    total++;
+                    if (debug) {
+                        push();
+                        stroke(255, 0, 0, separationSlider.value() * 100 + 30);
+                        line(
+                            this.position.x,
+                            this.position.y,
+                            this.position.x + vec.x,
+                            this.position.y + vec.y
+                        );
+                        pop();
+                    }
+                    this.flagsRGBforACS[2] = 1;
+                }
+            }
+        }
+        if (total > 0) {
+            steering.div(total);
+            steering.setMag(Boid.maxSpeed);
+            steering.sub(this.velocity);
+            steering.limit(Boid.maxForce);
+        }
+        return steering;
+    }
+
+    cohesion(boids, debug = false) {
+        let steering = createVector();
+        let total = 0;
+        this.flagsRGBforACS[1] = 0;
+        for (let other of boids) {
+            if (other.myColor != this.myColor) continue;
+
+            let d = this.toroidalDistance(other.position);
+
+            if (other != this && d < Boid.cohesionPerceptionRadius()) {
+                let { dx, dy } = this.ShortestDxDy(other.position);
+                let vec = createVector(dx, dy);
+                if (
+                    Math.abs(this.velocity.angleBetween(vec)) <
+                    PerceptionDagreesSlider.value()
+                ) {
+                    steering.add(other.position);
+                    total++;
+                    if (debug) {
+                        push();
+                        stroke(0, 0, 255, cohesionSlider.value() * 100 + 30);
+                        line(
+                            this.position.x,
+                            this.position.y,
+                            this.position.x + vec.x,
+                            this.position.y + vec.y
+                        );
+                        pop();
+                    }
+                    this.flagsRGBforACS[1] = 1;
+                }
+            }
+        }
+        if (total > 0) {
+            steering.div(total);
+            steering.sub(this.position);
+            steering.setMag(Boid.maxSpeed);
+            steering.sub(this.velocity);
+            steering.limit(Boid.maxForce);
+        }
+        return steering;
+    }
 
     seek(target, arrival = false) {
         let force = p5.Vector.sub(target, this.pos);
@@ -116,16 +258,25 @@ export class Boid {
     }
 
     evade(boid) {
-        let pursuit = this.pursue(boid);
+        let pursuit = this.pursue(boid,color(255,0,0));
         pursuit.mult(-1);
         return pursuit;
     }
 
-    pursue(boid) {
+    pursue(boid,draw=null) {
         let target = boid.pos.copy();
         let prediction = boid.vel.copy();
         prediction.mult(10);
         target.add(prediction);
+        if (draw && this.debug) {
+            push();
+            fill(draw);
+            noStroke();
+            circle(target.x, target.y, 3);
+            stroke(draw);
+            line(this.pos.x, this.pos.y, target.x, target.y);
+            pop();
+        }
         return this.seek(target);
     }
 
@@ -157,14 +308,14 @@ export class Boid {
         this.pos.add(this.vel);
         this.acc.set(0, 0);
         this.r = this.health / 6.25;
-        this.perceptionRadius = this.r * 5;
+        this.perceptionRadius = (this.r * 5) * (this.sight);
         this.maxForce = this.health / 500;
     }
 
     show() {
-        stroke(255);
+        stroke(this.color);
         strokeWeight(2);
-        fill(255);
+        fill(this.color);
         push();
         translate(this.pos.x, this.pos.y);
         rotate(this.vel.heading());
