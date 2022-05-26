@@ -78,11 +78,12 @@ export class Boid {
             }
             return;
         }
-        this.applyForce(this.pursue(boidToPursue, color(0, 255, 0)).mult(this.anger));
         if (this.isTouching(boidToPursue)) {
             this.health += boidToPursue.health / 10;
             boidToPursue.health = 0;
+            return;
         }
+        this.applyForce(this.pursue(boidToPursue, color(0, 255, 0)).mult(this.anger));
     }
 
     wander(perceptionPoint) {
@@ -312,6 +313,11 @@ export class Boid {
         drag.setMag(Math.min(this.health / 10000 * speedSq), 0.001);
         this.applyForce(drag);
     }
+
+    distance(other) {
+
+    }
+
 
     update() {
         this.drag();
