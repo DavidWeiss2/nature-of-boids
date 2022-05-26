@@ -337,7 +337,7 @@ export class Boid {
             oldestBoid = this;
             return;
         }
-        if (this.color === oldestBoid.color) this.debug = true;
+        if (this.color === oldestBoid.color) this.debug = debug;
     }
 
     show() {
