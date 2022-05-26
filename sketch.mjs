@@ -1,4 +1,3 @@
-import "./p5.js";
 import { Boid } from "./Boid.js";
 
 const numOfBoids = 50;
