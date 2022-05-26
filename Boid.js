@@ -1,3 +1,5 @@
+import { becomeFoodAt } from "./sketch.mjs";
+
 export class Boid {
 
     constructor(boidColor = null, x = random(window.innerWidth), y = random(window.innerHeight)) {
@@ -65,7 +67,8 @@ export class Boid {
     }
 
     pursueBoid(boidToPursue) {
-        this.applyForce(this.pursue(boidToPursue, color(0, 255, 0)).mult(this.anger));
+        if (boidToPursue.health <= becomeFoodAt) this.applyForce(this.arrive(boidToPursue.pos).mult(this.anger))
+        else this.applyForce(this.pursue(boidToPursue, color(0, 255, 0)).mult(this.anger));
         if (this.isTouching(boidToPursue)) {
             this.health += boidToPursue.health / 10;
             boidToPursue.health = 0;
@@ -87,13 +90,15 @@ export class Boid {
             line(this.pos.x, this.pos.y, perceptionPoint.x, perceptionPoint.y);
         }
 
-        let steer = perceptionPoint.sub(this.pos);
-        let steerMag = map(steer.mag(), 0, this.perceptionRadius * 2, 0, this.maxForce)
-        steer.setMag(steerMag);
+        // let steer = perceptionPoint.sub(this.pos);
+        // let steerMag = map(steer.mag(), 0, this.perceptionRadius * 2, 0, this.maxForce)
+        // steer.setMag(steerMag);
+
 
         let displaceRange = 0.3;
         this.wanderTheta += random(-displaceRange, displaceRange);
-        return steer;
+        // return steer;
+        return this.arrive(perceptionPoint);
     }
 
     flock(boids) {
@@ -250,7 +255,7 @@ export class Boid {
             let slowRadius = this.perceptionRadius;
             let distance = force.mag();
             if (distance < slowRadius) {
-                desiredSpeed = map(distance, 0, slowRadius, 0, this.vel);
+                desiredSpeed = map(distance, 0, slowRadius, desiredSpeed/5, desiredSpeed);
             }
         }
         force.setMag(desiredSpeed);

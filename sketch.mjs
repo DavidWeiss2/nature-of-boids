@@ -8,6 +8,8 @@ let height = window.innerHeight;
 let canvasArea = width * height;
 let debug = false;
 
+export const becomeFoodAt = 55;
+
 const boids = [];
 
 window.setup = function () {
@@ -29,8 +31,9 @@ window.draw = function () {
 			boids.splice(i, 1);
 			continue;
 		}
-		if (boids[i].health <= 55) {
+		if (boids[i].health <= becomeFoodAt) {
 			boids[i].vel.mult(0);
+			boids[i].health = becomeFoodAt;
 			fill(0, 255, 0);
 			noStroke();
 			circle(boids[i].pos.x, boids[i].pos.y, 16);
