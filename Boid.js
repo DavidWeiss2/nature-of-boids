@@ -1,4 +1,6 @@
-import { becomeFoodAt } from "./sketch.mjs";
+import { becomeFoodAt, debug, foodSize } from "./sketch.mjs";
+
+let oldestBoid = null;
 
 export class Boid {
 
@@ -22,6 +24,7 @@ export class Boid {
 
         this.wanderTheta = PI / 2;
         this.mesh = { head: createVector(0, 0), left: createVector(-this.r * 2, -this.r / 2), right: createVector(-this.r * 2, this.r / 2) };
+        this.birthDate = new Date();
         // this.mesh = { head: { x: 0, y: 0 }, left: { x: -this.r * 2, y: -this.r / 2 }, right: { x: -this.r * 2, y: this.r / 2 } };
     }
 
@@ -67,8 +70,15 @@ export class Boid {
     }
 
     pursueBoid(boidToPursue) {
-        if (boidToPursue.health <= becomeFoodAt) this.applyForce(this.arrive(boidToPursue.pos).mult(this.anger))
-        else this.applyForce(this.pursue(boidToPursue, color(0, 255, 0)).mult(this.anger));
+        if (boidToPursue.health <= becomeFoodAt) {
+            this.applyForce(this.arrive(boidToPursue.pos).mult(this.anger));
+            if (this.pos.dist(boidToPursue.pos) < foodSize) {
+                this.health += boidToPursue.health / 10;
+                boidToPursue.health = 0;
+            }
+            return;
+        }
+        this.applyForce(this.pursue(boidToPursue, color(0, 255, 0)).mult(this.anger));
         if (this.isTouching(boidToPursue)) {
             this.health += boidToPursue.health / 10;
             boidToPursue.health = 0;
@@ -249,7 +259,7 @@ export class Boid {
             let slowRadius = this.perceptionRadius;
             let distance = force.mag();
             if (distance < slowRadius) {
-                desiredSpeed = map(distance, 0, slowRadius, desiredSpeed/5, desiredSpeed);
+                desiredSpeed = map(distance, 0, slowRadius, desiredSpeed / 5, desiredSpeed);
             }
         }
         force.setMag(desiredSpeed);
@@ -311,6 +321,17 @@ export class Boid {
         this.r = this.health / 6.25;
         this.perceptionRadius = (this.r + 45) * (this.sight);
         this.maxForce = this.health / 500;
+        if (!oldestBoid || oldestBoid.health < becomeFoodAt) {
+            oldestBoid = this;
+            return;
+        }
+        if (this.birthDate < oldestBoid.birthDate) {
+            console.log("oldestBoid: " + oldestBoid.birthDate);
+            oldestBoid.debug = false;
+            oldestBoid = this;
+            return;
+        }
+        if (this.color === oldestBoid.color) this.debug = true;
     }
 
     show() {
