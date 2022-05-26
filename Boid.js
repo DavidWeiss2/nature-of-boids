@@ -19,6 +19,8 @@ export class Boid {
         this.maxForce = this.health / 500;
 
         this.wanderTheta = PI / 2;
+        this.mesh = { head: createVector(0, 0), left: createVector(-this.r * 2, -this.r / 2), right: createVector(-this.r * 2, this.r / 2) };
+        // this.mesh = { head: { x: 0, y: 0 }, left: { x: -this.r * 2, y: -this.r / 2 }, right: { x: -this.r * 2, y: this.r / 2 } };
     }
 
     ai(avoid, seek) {
@@ -63,8 +65,8 @@ export class Boid {
     }
 
     pursueBoid(boidToPursue) {
-        this.applyForce(this.pursue(boidToPursue,color(0,255,0)).mult(this.anger));
-        if (this.pos.dist(boidToPursue.pos) < this.r ** 0.5) {
+        this.applyForce(this.pursue(boidToPursue, color(0, 255, 0)).mult(this.anger));
+        if (this.isTouching(boidToPursue)) {
             this.health += boidToPursue.health / 10;
             boidToPursue.health = 0;
         }
@@ -258,12 +260,12 @@ export class Boid {
     }
 
     evade(boid) {
-        let pursuit = this.pursue(boid,color(255,0,0));
+        let pursuit = this.pursue(boid, color(255, 0, 0));
         pursuit.mult(-1);
         return pursuit;
     }
 
-    pursue(boid,draw=null) {
+    pursue(boid, draw = null) {
         let target = boid.pos.copy();
         let prediction = boid.vel.copy();
         prediction.mult(10);
@@ -319,7 +321,7 @@ export class Boid {
         push();
         translate(this.pos.x, this.pos.y);
         rotate(this.vel.heading());
-        triangle(-this.r * 2, -this.r / 2, -this.r * 2, this.r / 2, 0, 0);
+        triangle(this.mesh.left.x, this.mesh.left.y, this.mesh.right.x, this.mesh.right.y, this.mesh.head.x, this.mesh.head.y);
         pop();
     }
 
@@ -334,5 +336,51 @@ export class Boid {
         } else if (this.pos.y < -this.r) {
             this.pos.y = height + this.r;
         }
+    }
+
+    isTouching(boid) {
+        const myMeshWithPosition = getMeshInLocation(this);
+        const otherMeshWithPosition = getMeshInLocation(boid);
+
+        for (let v = 0; v < myMeshWithPosition.length; v++) {
+            const from = myMeshWithPosition[v];
+            const to = myMeshWithPosition[(v + 1) % myMeshWithPosition.length]
+            for (let v = 0; v < myMeshWithPosition.length; v++) {
+                const boidFrom = otherMeshWithPosition[v];
+                const boidTo = otherMeshWithPosition[(v + 1) % myMeshWithPosition.length];
+                if (isIntersects(from.x, from.y, to.x, to.y, boidFrom.x, boidFrom.y, boidTo.x, boidTo.y)) return true;
+            }
+        }
+        return false;
+
+        function getMeshInLocation(boid) {
+            let meshWithPosition = [];
+            for (let v = 0; v < Object.keys(boid.mesh).length; v++) {
+                meshWithPosition.push(Object.values(boid.mesh)[v].copy());
+                meshWithPosition[v].add(boid.pos);
+                const cos = Math.cos(boid.vel.heading());
+                const sin = Math.sin(boid.vel.heading());
+                const origin = boid.pos;
+                const point = meshWithPosition[v];
+
+                meshWithPosition[v] = createVector(
+                    (cos * (point.x - origin.x)) - (sin * (point.y - origin.y)) + origin.x,
+                    (cos * (point.y - origin.y)) + (sin * (point.x - origin.x)) + origin.y
+                );
+            }
+            return meshWithPosition;
+        }
+
+        function isIntersects(a, b, c, d, p, q, r, s) {
+            var det, gamma, lambda;
+            det = (c - a) * (s - q) - (r - p) * (d - b);
+            if (det === 0) {
+                return false;
+            } else {
+                lambda = ((s - q) * (r - a) + (p - r) * (s - b)) / det;
+                gamma = ((b - d) * (r - a) + (c - a) * (s - b)) / det;
+                return (0 < lambda && lambda < 1) && (0 < gamma && gamma < 1);
+            }
+        };
     }
 }

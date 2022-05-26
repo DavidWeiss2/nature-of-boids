@@ -1,7 +1,7 @@
 import "./p5.js";
 import { Boid } from "./Boid.js";
 
-const numOfBoids = 30;
+const numOfBoids = 50;
 
 let width = window.innerWidth;
 let height = window.innerHeight;
@@ -44,8 +44,8 @@ window.draw = function () {
 		boids[i].debug = false;
 	}
 	if (boids.length < numOfBoids && random() < 0.1) {
-		let color = boids[Math.floor(random(boids.length))].color;
-		boids.push(new Boid());
+		let color = random(1)>0.5 ? boids[Math.floor(random(boids.length))].color : null;
+		boids.push(new Boid(color));
 	}
 };
 
@@ -54,6 +54,11 @@ window.keyReleased = function () {
 		debug = !debug;
 	}
 };
+
+window.mouseClicked = function () {
+	const boidColor = color(random(255), random(255), random(255));
+	boids.push(new Boid(boidColor, mouseX, mouseY));
+}
 
 window.onresize = function () {
 	width = window.innerWidth;
