@@ -7,9 +7,9 @@ export class Boid {
         if (this.color === null) {
             this.color = color(random(255), random(255), random(255));
         }
-        this.fear = map(this.color.levels[0], 0, 255, -1, 1);
-        this.sight = map(this.color.levels[1], 0, 255, 0, 2);
-        this.anger = map(this.color.levels[2], 0, 255, -1, 1);
+        this.fear = map(this.color.levels[0], 0, 255, 0.1, 1);
+        this.sight = map(this.color.levels[1], 0, 255, 0.5, 2);
+        this.anger = map(this.color.levels[2], 0, 255, 0.1, 1);
 
         this.debug = false;
         this.pos = createVector(x, y);
