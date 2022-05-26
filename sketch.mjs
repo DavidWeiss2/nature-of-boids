@@ -31,6 +31,7 @@ window.draw = function () {
 		if (boids[i].health <= becomeFoodAt) {
 			boids[i].vel.mult(0);
 			boids[i].health = becomeFoodAt;
+			boids[i].color = null;
 			fill(0, 255, 0);
 			noStroke();
 			circle(boids[i].pos.x, boids[i].pos.y, foodSize);

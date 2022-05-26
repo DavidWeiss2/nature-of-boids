@@ -43,10 +43,15 @@ export class Boid {
             circle(this.pos.x, this.pos.y, this.perceptionRadius * 2 * 2);
         }
         let forceWasApplied = false;
+        const friends = []
 
         if (avoid.length > 0) {
             for (let i = 0; i < avoid.length; i++) {
                 if (this.pos.dist(avoid[i].pos) > this.perceptionRadius * 2) continue;
+                if (this.color === avoid[i].color) {
+                    friends.push(avoid[i]);
+                    continue;
+                }
                 this.applyForce(this.evade(avoid[i]).mult(this.fear));
                 forceWasApplied = true;
             }
@@ -55,6 +60,10 @@ export class Boid {
             let closest = -1;
             for (let i = 0; i < seek.length; i++) {
                 if (perceptionPoint.dist(seek[i].pos) > this.perceptionRadius * 1.5) continue;
+                if (this.color === seek[i].color) {
+                    friends.push(seek[i]);
+                    continue;
+                }
                 if (closest == -1 || this.pos.dist(seek[i].pos) < this.pos.dist(seek[closest].pos)) {
                     closest = i;
                 }
@@ -332,7 +341,6 @@ export class Boid {
             return;
         }
         if (this.birthDate < oldestBoid.birthDate) {
-            console.log("oldestBoid: " + oldestBoid.birthDate);
             oldestBoid.debug = false;
             oldestBoid = this;
             return;
@@ -342,6 +350,7 @@ export class Boid {
 
     show() {
         stroke(this.color);
+        if (this === oldestBoid) stroke(255);
         strokeWeight(2);
         fill(this.color);
         push();
