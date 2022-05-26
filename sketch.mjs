@@ -22,9 +22,7 @@ window.setup = function () {
 window.draw = function () {
 	background(0);
 	boids.sort((a, b) => b.health - a.health);
-	boids[Math.floor(boids.length / 2)].debug = debug;
 	boids[0].debug = debug;
-	boids[boids.length-1].debug = debug;
 	for (let i = boids.length; i--;) {
 		if (boids[i].health <= 0) {
 			boids.splice(i, 1);

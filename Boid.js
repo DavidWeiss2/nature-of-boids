@@ -90,14 +90,8 @@ export class Boid {
             line(this.pos.x, this.pos.y, perceptionPoint.x, perceptionPoint.y);
         }
 
-        // let steer = perceptionPoint.sub(this.pos);
-        // let steerMag = map(steer.mag(), 0, this.perceptionRadius * 2, 0, this.maxForce)
-        // steer.setMag(steerMag);
-
-
         let displaceRange = 0.3;
         this.wanderTheta += random(-displaceRange, displaceRange);
-        // return steer;
         return this.arrive(perceptionPoint);
     }
 
@@ -315,7 +309,7 @@ export class Boid {
         this.pos.add(this.vel);
         this.acc.set(0, 0);
         this.r = this.health / 6.25;
-        this.perceptionRadius = (this.r * 5) * (this.sight);
+        this.perceptionRadius = (this.r + 45) * (this.sight);
         this.maxForce = this.health / 500;
     }
 
