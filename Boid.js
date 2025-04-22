@@ -3,7 +3,6 @@ import { becomeFoodAt, debug, foodSize } from "./sketch.mjs";
 let oldestBoid = null;
 
 export class Boid {
-
     constructor(boidColor = null, x = random(window.innerWidth), y = random(window.innerHeight)) {
         this.color = boidColor;
         if (this.color === null) {
@@ -17,10 +16,11 @@ export class Boid {
         this.pos = createVector(x, y);
         this.vel = createVector(1, 0);
         this.acc = createVector(0, 0);
-        this.health = random(150);
+        this.health = random(150) + 1;
         this.r = this.health / 6.25;
-        this.perceptionRadius = (this.r * 5) * (this.sight);
+        this.perceptionRadius = (this.r * 10) * (this.sight);
         this.maxForce = this.health / 500;
+        this.maxSpeed = 3;
 
         this.wanderTheta = PI / 2;
         this.mesh = { head: createVector(0, 0), left: createVector(-this.r * 2, -this.r / 2), right: createVector(-this.r * 2, this.r / 2) };
@@ -28,7 +28,7 @@ export class Boid {
         // this.mesh = { head: { x: 0, y: 0 }, left: { x: -this.r * 2, y: -this.r / 2 }, right: { x: -this.r * 2, y: this.r / 2 } };
     }
 
-    ai(avoid, seek) {
+    ai(avoid, seek, flock) {
         let perceptionPoint = this.vel.copy();
         perceptionPoint.setMag(this.perceptionRadius);
         perceptionPoint.add(this.pos);
@@ -43,15 +43,10 @@ export class Boid {
             circle(this.pos.x, this.pos.y, this.perceptionRadius * 2 * 2);
         }
         let forceWasApplied = false;
-        const friends = []
 
         if (avoid.length > 0) {
             for (let i = 0; i < avoid.length; i++) {
                 if (this.pos.dist(avoid[i].pos) > this.perceptionRadius * 2) continue;
-                if (this.color === avoid[i].color) {
-                    friends.push(avoid[i]);
-                    continue;
-                }
                 this.applyForce(this.evade(avoid[i]).mult(this.fear));
                 forceWasApplied = true;
             }
@@ -60,10 +55,6 @@ export class Boid {
             let closest = -1;
             for (let i = 0; i < seek.length; i++) {
                 if (perceptionPoint.dist(seek[i].pos) > this.perceptionRadius * 1.5) continue;
-                if (this.color === seek[i].color) {
-                    friends.push(seek[i]);
-                    continue;
-                }
                 if (closest == -1 || this.pos.dist(seek[i].pos) < this.pos.dist(seek[closest].pos)) {
                     closest = i;
                 }
@@ -75,20 +66,27 @@ export class Boid {
             }
         }
         if (forceWasApplied) return;
-        this.applyForce(this.wander(perceptionPoint));
+        if (flock.length > 0) {
+            this.flock(flock, this.debug);
+        } else {
+            this.applyForce(this.wander(perceptionPoint));
+        }
     }
 
     pursueBoid(boidToPursue) {
-        if (boidToPursue.health <= becomeFoodAt) {
+        const isSameColor = this.color?.toString() === boidToPursue.color?.toString();
+        if (boidToPursue.health <= becomeFoodAt && !isSameColor) {
             this.applyForce(this.arrive(boidToPursue.pos).mult(this.anger));
             if (this.pos.dist(boidToPursue.pos) < foodSize) {
-                this.health += boidToPursue.health / 10;
+                this.health += boidToPursue.health;
+                this.health = min(this.health, min(width, height) / 10);
                 boidToPursue.health = 0;
             }
             return;
         }
-        if (this.isTouching(boidToPursue)) {
-            this.health += boidToPursue.health / 10;
+        if (this.isTouching(boidToPursue) && !isSameColor) {
+            this.health += max(boidToPursue.health / 10, becomeFoodAt);
+            this.health = min(this.health, min(width, height) / 10);
             boidToPursue.health = 0;
             return;
         }
@@ -115,151 +113,105 @@ export class Boid {
         return this.arrive(perceptionPoint);
     }
 
-    flock(boids) {
-        if (!separationOnBoidsFromOtherSpecies.checked()) {
-            boids = boids.filter((boid) => boid.myColor === this.myColor);
+    flock(boids, debug) {
+        // Filter boids to only include those of the same color
+        let sameColorBoids = boids.filter(other => {
+            if (other === this) return false;
+            return this.color?.toString() === other.color?.toString();
+        });
+
+        if (sameColorBoids.length === 0) {
+            this.applyForce(this.wander(this.pos.copy().add(this.vel.copy().setMag(this.perceptionRadius))));
+            return;
         }
 
-        let alignment = this.align(boids, debug);
-        let cohesion = this.cohesion(boids, debug);
-        let separation = this.separation(boids, debug);
+        let alignment = this.align(sameColorBoids, debug);
+        let cohesion = this.cohesion(sameColorBoids, debug);
+        let separation = this.separation(sameColorBoids, debug);
 
-        alignment.mult(alignSlider.value());
-        cohesion.mult(cohesionSlider.value());
-        separation.mult(separationSlider.value());
-
-        this.acceleration.add(alignment);
-        this.acceleration.add(cohesion);
-        this.acceleration.add(separation);
+        // Apply forces with weights
+        this.applyForce(alignment.mult(1.0));
+        this.applyForce(cohesion.mult(1.0));
+        this.applyForce(separation.mult(1.5));
     }
 
     align(boids, debug = false) {
         let steering = createVector();
         let total = 0;
-        this.flagsRGBforACS[0] = 0;
+
         for (let other of boids) {
-            if (other.myColor != this.myColor) continue;
-            let d = this.toroidalDistance(other.position);
-            if (other != this && d < Boid.alignmentPerceptionRadius()) {
-                let { dx, dy } = this.ShortestDxDy(other.position);
-                let vec = createVector(dx, dy);
-                if (
-                    Math.abs(this.velocity.angleBetween(vec)) <
-                    PerceptionDagreesSlider.value()
-                ) {
-                    steering.add(other.velocity);
-                    total++;
-                    if (debug) {
-                        push();
-                        stroke(0, 255, 0, alignSlider.value() * 100 + 30);
-                        line(
-                            this.position.x,
-                            this.position.y,
-                            this.position.x + vec.x,
-                            this.position.y + vec.y
-                        );
-                        pop();
-                    }
-                    this.flagsRGBforACS[0] = 1;
-                }
-            }
+            let { dx, dy } = this.ShortestDxDy(other);
+            let vec = createVector(dx, dy);
+            steering.add(other.vel);
+            total++;
         }
+
         if (total > 0) {
             steering.div(total);
-            steering.setMag(Boid.maxSpeed);
-            steering.sub(this.velocity);
-            steering.limit(Boid.maxForce);
+            steering.setMag(this.maxSpeed);
+            steering.sub(this.vel);
+            steering.limit(this.maxForce);
         }
+
         return steering;
     }
 
     separation(boids, debug = false) {
         let steering = createVector();
         let total = 0;
-        this.flagsRGBforACS[2] = 0;
+
         for (let other of boids) {
-            if (
-                !separationOnBoidsFromOtherSpecies.checked() &&
-                other.myColor != this.myColor
-            )
-                continue;
-            let d = this.toroidalDistance(other.position);
-            if (other != this && d < Boid.separationPerceptionRadius()) {
-                let { dx, dy } = this.ShortestDxDy(other.position);
-                let vec = createVector(dx, dy);
-                if (
-                    Math.abs(this.velocity.angleBetween(vec)) <
-                    PerceptionDagreesSlider.value()
-                ) {
-                    let diff = p5.Vector.sub(this.position, other.position);
-                    diff.div(d * d);
-                    steering.add(diff);
-                    total++;
-                    if (debug) {
-                        push();
-                        stroke(255, 0, 0, separationSlider.value() * 100 + 30);
-                        line(
-                            this.position.x,
-                            this.position.y,
-                            this.position.x + vec.x,
-                            this.position.y + vec.y
-                        );
-                        pop();
-                    }
-                    this.flagsRGBforACS[2] = 1;
-                }
+            let { dx, dy } = this.ShortestDxDy(other);
+            let vec = createVector(dx, dy);
+            let d = vec.mag();
+            
+            if (d > 0) {
+                let diff = vec.copy();
+                diff.normalize();
+                diff.div(d); // Weight by inverse distance
+                steering.add(diff);
+                total++;
             }
         }
+
         if (total > 0) {
             steering.div(total);
-            steering.setMag(Boid.maxSpeed);
-            steering.sub(this.velocity);
-            steering.limit(Boid.maxForce);
+            steering.setMag(this.maxSpeed);
+            steering.sub(this.vel);
+            steering.limit(this.maxForce);
         }
+
         return steering;
     }
 
     cohesion(boids, debug = false) {
         let steering = createVector();
         let total = 0;
-        this.flagsRGBforACS[1] = 0;
+
         for (let other of boids) {
-            if (other.myColor != this.myColor) continue;
-
-            let d = this.toroidalDistance(other.position);
-
-            if (other != this && d < Boid.cohesionPerceptionRadius()) {
-                let { dx, dy } = this.ShortestDxDy(other.position);
-                let vec = createVector(dx, dy);
-                if (
-                    Math.abs(this.velocity.angleBetween(vec)) <
-                    PerceptionDagreesSlider.value()
-                ) {
-                    steering.add(other.position);
-                    total++;
-                    if (debug) {
-                        push();
-                        stroke(0, 0, 255, cohesionSlider.value() * 100 + 30);
-                        line(
-                            this.position.x,
-                            this.position.y,
-                            this.position.x + vec.x,
-                            this.position.y + vec.y
-                        );
-                        pop();
-                    }
-                    this.flagsRGBforACS[1] = 1;
-                }
-            }
+            let { dx, dy } = this.ShortestDxDy(other);
+            let vec = createVector(dx, dy);
+            steering.add(vec);
+            total++;
         }
+
         if (total > 0) {
             steering.div(total);
-            steering.sub(this.position);
-            steering.setMag(Boid.maxSpeed);
-            steering.sub(this.velocity);
-            steering.limit(Boid.maxForce);
+            steering.sub(this.pos);
+            steering.setMag(this.maxSpeed);
+            steering.sub(this.vel);
+            steering.limit(this.maxForce);
         }
+
         return steering;
+    }
+
+    ShortestDxDy(other) {
+        let dx = other.pos.x - this.pos.x;
+        let dy = other.pos.y - this.pos.y;
+        if (dx > width / 2) dx -= width;
+        if (dy > height / 2) dy -= height;
+        return { dx, dy };
     }
 
     seek(target, arrival = false) {
@@ -269,11 +221,12 @@ export class Boid {
             let slowRadius = this.perceptionRadius;
             let distance = force.mag();
             if (distance < slowRadius) {
-                desiredSpeed = map(distance, 0, slowRadius, desiredSpeed / 5, desiredSpeed);
+                desiredSpeed = map(distance, 0.00001, slowRadius, desiredSpeed / 5, desiredSpeed);
             }
         }
         force.setMag(desiredSpeed);
         force.sub(this.vel);
+        console.log(force.mag(), this.maxForce, { ...this });
         force.limit(this.maxForce);
         return force;
     }
@@ -333,10 +286,12 @@ export class Boid {
         this.vel.add(this.acc);
         this.pos.add(this.vel);
         this.acc.set(0, 0);
-        this.r = this.health / 6.25;
-        this.perceptionRadius = (this.r + 45) * (this.sight);
-        this.maxForce = this.health / 500;
-        if (!oldestBoid || oldestBoid.health < becomeFoodAt) {
+        if (this.health) {
+            this.r = this.health / 6.25;
+            this.perceptionRadius = (this.r + 45) * (this.sight);
+            this.maxForce = this.health / 500;
+        }
+        if (!oldestBoid || oldestBoid.health <= becomeFoodAt) {
             oldestBoid = this;
             return;
         }
@@ -362,48 +317,48 @@ export class Boid {
 
     edges() {
         if (this.pos.x > width + this.r) {
-            this.pos.x = -this.r;
+            this.pos.x = this.r;
         } else if (this.pos.x < -this.r) {
-            this.pos.x = width + this.r;
+            this.pos.x = width - this.r;
         }
         if (this.pos.y > height + this.r) {
-            this.pos.y = -this.r;
+            this.pos.y = this.r;
         } else if (this.pos.y < -this.r) {
-            this.pos.y = height + this.r;
+            this.pos.y = height - this.r;
         }
     }
 
     isTouching(boid) {
-        const myMeshWithPosition = getMeshInLocation(this);
-        const otherMeshWithPosition = getMeshInLocation(boid);
+        const myMeshWithpos = getMeshInLocation(this);
+        const otherMeshWithpos = getMeshInLocation(boid);
 
-        for (let v = 0; v < myMeshWithPosition.length; v++) {
-            const from = myMeshWithPosition[v];
-            const to = myMeshWithPosition[(v + 1) % myMeshWithPosition.length]
-            for (let v = 0; v < myMeshWithPosition.length; v++) {
-                const boidFrom = otherMeshWithPosition[v];
-                const boidTo = otherMeshWithPosition[(v + 1) % myMeshWithPosition.length];
+        for (let v = 0; v < myMeshWithpos.length; v++) {
+            const from = myMeshWithpos[v];
+            const to = myMeshWithpos[(v + 1) % myMeshWithpos.length]
+            for (let v = 0; v < myMeshWithpos.length; v++) {
+                const boidFrom = otherMeshWithpos[v];
+                const boidTo = otherMeshWithpos[(v + 1) % myMeshWithpos.length];
                 if (isIntersects(from.x, from.y, to.x, to.y, boidFrom.x, boidFrom.y, boidTo.x, boidTo.y)) return true;
             }
         }
         return false;
 
         function getMeshInLocation(boid) {
-            let meshWithPosition = [];
+            let meshWithpos = [];
             for (let v = 0; v < Object.keys(boid.mesh).length; v++) {
-                meshWithPosition.push(Object.values(boid.mesh)[v].copy());
-                meshWithPosition[v].add(boid.pos);
+                meshWithpos.push(Object.values(boid.mesh)[v].copy());
+                meshWithpos[v].add(boid.pos);
                 const cos = Math.cos(boid.vel.heading());
                 const sin = Math.sin(boid.vel.heading());
                 const origin = boid.pos;
-                const point = meshWithPosition[v];
+                const point = meshWithpos[v];
 
-                meshWithPosition[v] = createVector(
+                meshWithpos[v] = createVector(
                     (cos * (point.x - origin.x)) - (sin * (point.y - origin.y)) + origin.x,
                     (cos * (point.y - origin.y)) + (sin * (point.x - origin.x)) + origin.y
                 );
             }
-            return meshWithPosition;
+            return meshWithpos;
         }
 
         function isIntersects(a, b, c, d, p, q, r, s) {

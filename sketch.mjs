@@ -6,11 +6,16 @@ let width = window.innerWidth;
 let height = window.innerHeight;
 let canvasArea = width * height;
 export const foodSize = 16;
-export let debug = false;
+export let debug = true;
 
 export const becomeFoodAt = 55;
+const warn = window.console.warn;
+window.console.warn = function (...args) {
+	warn(...args);
+	debugger;
+}
 
-const boids = [];
+let boids = [];
 
 window.setup = function () {
 	createCanvas(width, height);
@@ -22,14 +27,13 @@ window.setup = function () {
 
 window.draw = function () {
 	background(0);
-	boids.sort((a, b) => b.health - a.health);
+	boids = boids.sort((a, b) => b.health - a.health).filter(b => b.health > 0);
 	for (let i = boids.length; i--;) {
 		if (boids[i].health <= 0) {
-			boids.splice(i, 1);
 			continue;
 		}
 		if (boids[i].health <= becomeFoodAt) {
-			boids[i].vel.mult(0);
+			boids[i].vel.setMag(0);
 			boids[i].health = becomeFoodAt;
 			boids[i].color = null;
 			fill(0, 255, 0);
@@ -37,13 +41,27 @@ window.draw = function () {
 			circle(boids[i].pos.x, boids[i].pos.y, foodSize);
 			continue;
 		}
-		boids[i].ai(boids.slice(0, i), boids.slice(i + 1, boids.length));
+		const { avoid, seek, flock } = boids.filter(b => b.health >= 0).reduce((acc, boid, bIndex) => {
+			if(boid.health <= 0) return acc;
+			if(boid === boids[i]) return acc;
+			if(boid.color?.toString() === boids[i].color?.toString()) {
+				acc.flock.push(boid);
+			} else if(bIndex > i) {
+				acc.seek.push(boid);
+			} else {
+				acc.avoid.push(boid);
+			}
+			return acc;
+		}, { avoid: [], seek: [], flock: [] });
+		boids[i].ai(avoid, seek, flock);
 		boids[i].edges();
 		boids[i].update();
 		boids[i].show();
-		boids[i].health **= 0.9999;
+		if(flock.length === 0) {
+			boids[i].health **= 0.9999;
+		}
 	}
-	if (boids.length < numOfBoids && random() < 0.1) {
+	if (boids.filter(b => b.health > becomeFoodAt).length < numOfBoids && random() < 0.1) {
 		let color = random(1)>0.5 ? boids[Math.floor(random(boids.length))].color : null;
 		boids.push(new Boid(color));
 	}
