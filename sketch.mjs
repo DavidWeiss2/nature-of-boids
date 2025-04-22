@@ -6,7 +6,7 @@ let width = window.innerWidth;
 let height = window.innerHeight;
 let canvasArea = width * height;
 export const foodSize = 16;
-export let debug = true;
+export let debug = false;
 
 export const becomeFoodAt = 55;
 const warn = window.console.warn;
@@ -60,6 +60,9 @@ window.draw = function () {
 		if(flock.length === 0) {
 			boids[i].health **= 0.9999;
 		}
+	}
+	if(boids.length >= numOfBoids && boids.at(0).color === boids.at(-1).color && boids.every(b=>b.color === boids.at(0).color)) {
+		boids.slice(-10, boids.length).forEach(b=>b.health = becomeFoodAt);
 	}
 	if (boids.filter(b => b.health > becomeFoodAt).length < numOfBoids && random() < 0.1) {
 		let color = random(1)>0.5 ? boids[Math.floor(random(boids.length))].color : null;

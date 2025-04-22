@@ -79,14 +79,14 @@ export class Boid {
             this.applyForce(this.arrive(boidToPursue.pos).mult(this.anger));
             if (this.pos.dist(boidToPursue.pos) < foodSize) {
                 this.health += boidToPursue.health;
-                this.health = min(this.health, min(width, height) / 10);
+                this.health = min(this.health, min(width, height));
                 boidToPursue.health = 0;
             }
             return;
         }
         if (this.isTouching(boidToPursue) && !isSameColor) {
             this.health += max(boidToPursue.health / 10, becomeFoodAt);
-            this.health = min(this.health, min(width, height) / 10);
+            this.health = min(this.health, min(width, height));
             boidToPursue.health = 0;
             return;
         }
@@ -115,103 +115,9 @@ export class Boid {
 
     flock(boids, debug) {
         // Filter boids to only include those of the same color
-        let sameColorBoids = boids.filter(other => {
-            if (other === this) return false;
-            return this.color?.toString() === other.color?.toString();
-        });
-
-        if (sameColorBoids.length === 0) {
-            this.applyForce(this.wander(this.pos.copy().add(this.vel.copy().setMag(this.perceptionRadius))));
-            return;
-        }
-
-        let alignment = this.align(sameColorBoids, debug);
-        let cohesion = this.cohesion(sameColorBoids, debug);
-        let separation = this.separation(sameColorBoids, debug);
-
-        // Apply forces with weights
-        this.applyForce(alignment.mult(1.0));
-        this.applyForce(cohesion.mult(1.0));
-        this.applyForce(separation.mult(1.5));
-    }
-
-    align(boids, debug = false) {
-        let steering = createVector();
-        let total = 0;
-
-        for (let other of boids) {
-            let { dx, dy } = this.ShortestDxDy(other);
-            let vec = createVector(dx, dy);
-            steering.add(other.vel);
-            total++;
-        }
-
-        if (total > 0) {
-            steering.div(total);
-            steering.setMag(this.maxSpeed);
-            steering.sub(this.vel);
-            steering.limit(this.maxForce);
-        }
-
-        return steering;
-    }
-
-    separation(boids, debug = false) {
-        let steering = createVector();
-        let total = 0;
-
-        for (let other of boids) {
-            let { dx, dy } = this.ShortestDxDy(other);
-            let vec = createVector(dx, dy);
-            let d = vec.mag();
-            
-            if (d > 0) {
-                let diff = vec.copy();
-                diff.normalize();
-                diff.div(d); // Weight by inverse distance
-                steering.add(diff);
-                total++;
-            }
-        }
-
-        if (total > 0) {
-            steering.div(total);
-            steering.setMag(this.maxSpeed);
-            steering.sub(this.vel);
-            steering.limit(this.maxForce);
-        }
-
-        return steering;
-    }
-
-    cohesion(boids, debug = false) {
-        let steering = createVector();
-        let total = 0;
-
-        for (let other of boids) {
-            let { dx, dy } = this.ShortestDxDy(other);
-            let vec = createVector(dx, dy);
-            steering.add(vec);
-            total++;
-        }
-
-        if (total > 0) {
-            steering.div(total);
-            steering.sub(this.pos);
-            steering.setMag(this.maxSpeed);
-            steering.sub(this.vel);
-            steering.limit(this.maxForce);
-        }
-
-        return steering;
-    }
-
-    ShortestDxDy(other) {
-        let dx = other.pos.x - this.pos.x;
-        let dy = other.pos.y - this.pos.y;
-        if (dx > width / 2) dx -= width;
-        if (dy > height / 2) dy -= height;
-        return { dx, dy };
+        const biggerBoids = boids.filter(other => other.health > this.health);
+        const smallerBoids = boids.filter(other => other.health < this.health);
+        this.ai(smallerBoids, biggerBoids,[]);
     }
 
     seek(target, arrival = false) {
